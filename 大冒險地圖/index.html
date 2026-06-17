@@ -179,6 +179,29 @@
       100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
     }
 
+    /* Victory Image Pop */
+    .victory-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 50px;
+      flex-wrap: wrap;
+    }
+    .victory-img {
+      max-width: 300px;
+      width: 100%;
+      animation: popIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      animation-delay: 0.5s;
+      opacity: 0;
+      transform: scale(0);
+      filter: drop-shadow(0 0 20px rgba(255, 213, 79, 0.5));
+    }
+    @keyframes popIn {
+      0% { transform: scale(0); opacity: 0; }
+      80% { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
   </style>
 </head>
 <body>
@@ -254,10 +277,15 @@
 
   <!-- Victory Screen -->
   <div id="victory-screen">
-    <h1>🏆 冒險完成！</h1>
-    <h2>請領取冒險者金幣2枚</h2>
-    <div class="victory-stats" id="time-display">總冒險時長：00 分 00 秒</div>
-    <button class="btn-restart" onclick="resetProgress()">再次冒險</button>
+    <div class="victory-container">
+      <div>
+        <h1>🏆 冒險完成！</h1>
+        <h2>請領取冒險者金幣2枚</h2>
+        <div class="victory-stats" id="time-display">總冒險時長：00 分 00 秒</div>
+        <button class="btn-restart" onclick="resetProgress()">再次冒險</button>
+      </div>
+      <img src="ending.png" class="victory-img" alt="冒險成功" />
+    </div>
   </div>
 
   <script>
