@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>森之尋字 - 探索遊戲</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        :root {
+            --primary: #6A8D73;
+            --secondary: #C3D8C3;
+            --bg-top: #FFFBF0;
+            --bg-bottom: #E2EBD5;
+            --text-color: #53504A;
+            --accent: #D77A61;
+            --highlight: #FDE0AA;
+            --grid-bg: rgba(255,255,255,0.95);
+            --wood: #A37C58;
+        }
+
+        body {
+            font-family: 'Segoe UI','Microsoft JhengHei','PingFang TC','Noto Sans TC',sans-serif;
+            margin: 0; padding: 0;
+            color: var(--text-color);
+            background: linear-gradient(135deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+            min-height: 100vh; min-height: 100dvh;
+            display: flex; flex-direction: column; align-items: center;
+            overflow-x: hidden; position: relative;
+        }
+
+        /* ===== 動畫 ===== */
+        @keyframes shake {
+            0%,100% { transform: translate(0,0); }
+            10% { transform: translate(-2px,-1px); }
+            30% { transform: translate(2px,1px); }
+            50% { transform: translate(-1px,2px); }
+            70% { transform: translate(2px,-1px); }
+            90% { transform: translate(-1px,1px); }
+        }
+        .shake-screen { animation: shake 0.4s; }
+
+        @keyframes fall {
+            0% { transform: translateY(-50px) rotate(0deg) scale(0.5); opacity: 0; }
+            10% { opacity: 0.25; }
+            90% { opacity: 0.25; }
+            100% { transform: translateY(100vh) rotate(360deg) scale(1.2); opacity: 0; }
+        }
+        @keyframes pulse-highlight {
+            0%,100% { background-color: var(--grid-bg); box-shadow: 0 0 0 var(--accent); }
+            50% { background-color: var(--highlight); box-shadow: 0 0 10px var(--accent); transform: scale(1.08); }
+        }
+        @keyframes pop-in {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes bounce-fall {
+            0% { transform: translateY(-100px) rotate(0); opacity: 1; }
+            50% { transform: translateY(50vh) rotate(180deg); }
+            100% { transform: translateY(110vh) rotate(360deg); opacity: 0.4; }
+        }
+
+        /* ===== 背景落葉 ===== */
+        .leaf {
+            position: absolute; width: 14px; height: 14px;
+            border-radius: 0 10px 0 10px; opacity: 0.2;
+            animation: fall linear infinite; z-index: 0; pointer-events: none;
+        }
+
+        /* ===== 大叉叉 ===== */
+        #cross-mark {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%,-50%) scale(0);
+            font-size: min(15rem, 40vw);
+            color: rgba(230,50,50,0.85); z-index: 200;
+            pointer-events: none; opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
+            text-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+        #cross-mark.show { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+
+        /* ===== 標題 ===== */
+        h1 {
+            color: var(--primary); text-align: center;
+            margin: 15px 0 5px; font-size: clamp(1.4rem, 5vw, 2.8rem);
+            text-shadow: 1px 1px 3px rgba(106,141,115,0.2);
+            z-index: 1; letter-spacing: 2px; transition: opacity 1s;
+        }
+        .subtitle {
+            color: var(--wood); text-align: center;
+            margin-bottom: 8px; font-weight: bold;
+            font-size: clamp(0.75rem, 2.5vw, 1rem);
+            z-index: 1; transition: opacity 1s; padding: 0 10px;
+        }
+
+        /* ===== 開始畫面 ===== */
+        #start-screen {
+            background: #FFFDF9; padding: clamp(20px,4vw,40px) clamp(20px,5vw,50px);
+            border-radius: 20px; box-shadow: 0 10px 30px rgba(106,141,115,0.15);
+            text-align: center; z-index: 10; margin-top: 5vh; max-width: 90%; width: 350px;
+        }
+        #start-screen h2 { color: var(--primary); margin-top: 0; font-size: clamp(1.1rem,3.5vw,1.5rem); }
+        #start-screen p { color: #666; margin-bottom: 20px; font-size: clamp(0.85rem,2.5vw,1rem); }
+        #start-screen input {
+            padding: 10px 16px; font-size: 1rem;
+            border: 2px solid var(--secondary); border-radius: 10px;
+            margin-bottom: 20px; outline: none; width: 80%; max-width: 200px;
+            color: var(--text-color); background-color: #FAFAFA;
+        }
+        #start-screen input:focus { border-color: var(--primary); background-color: #FFF; }
+        #start-screen button {
+            background-color: var(--primary); color: white;
+            border: none; padding: 11px 28px; font-size: 1.1rem;
+            border-radius: 30px; cursor: pointer; transition: all 0.3s;
+            display: block; margin: 0 auto;
+            box-shadow: 0 4px 10px rgba(106,141,115,0.3);
+        }
+        #start-screen button:hover {
+            background-color: #55725C; transform: translateY(-2px);
+        }
+
+        /* ===== 頂部狀態列 ===== */
+        .stats-bar {
+            display: none; width: 100%;
+            justify-content: center; gap: clamp(10px, 4vw, 40px);
+            background: linear-gradient(135deg, rgba(106,141,115,0.95), rgba(85,114,92,0.95));
+            color: white; padding: clamp(8px,1.5vw,14px) 15px;
+            font-weight: bold; font-size: clamp(0.8rem, 2.8vw, 1.25rem);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 90; position: sticky; top: 0;
+            backdrop-filter: blur(8px);
+            border-bottom: 2px solid rgba(255,255,255,0.15);
+        }
+        .stat-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+
+        /* ===== 遊戲容器 ===== */
+        .game-container {
+            display: none; gap: clamp(10px, 2vw, 30px);
+            width: 100%; max-width: 1200px;
+            justify-content: center; flex-wrap: wrap;
+            z-index: 1; padding: 8px clamp(5px,2vw,20px) 30px;
+            transition: opacity 1s;
+        }
+        .left-panel {
+            display: flex; flex-direction: column; align-items: center;
+            width: 100%; max-width: 650px;
+        }
+        .right-panel {
+            background-color: rgba(255,253,249,0.95);
+            padding: clamp(10px,2vw,25px);
+            border-radius: 16px;
+            box-shadow: 0 8px 25px rgba(106,141,115,0.1);
+            width: 100%; max-width: 450px;
+        }
+        .right-panel h2 {
+            margin-top: 0; color: var(--wood); text-align: center;
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 12px; letter-spacing: 1px;
+            font-size: clamp(0.95rem, 3vw, 1.3rem);
+        }
+
+        /* ===== 格子網格 ===== */
+        .grid {
+            display: grid; grid-template-columns: repeat(10, 1fr);
+            gap: clamp(2px, 0.6vw, 6px);
+            background-color: var(--secondary);
+            padding: clamp(4px, 1vw, 12px);
+            border-radius: clamp(8px, 1.5vw, 14px);
+            user-select: none; touch-action: none;
+            box-shadow: 0 8px 20px rgba(106,141,115,0.15);
+            width: 100%; max-width: 620px;
+        }
+        .cell {
+            aspect-ratio: 1; width: 100%;
+            background-color: var(--grid-bg);
+            display: flex; justify-content: center; align-items: center;
+            font-size: clamp(0.85rem, 3.2vw, 1.5rem);
+            font-weight: bold;
+            border-radius: clamp(4px, 0.8vw, 8px);
+            cursor: pointer; transition: all 0.15s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+            color: #444;
+        }
+        .cell:hover { background-color: var(--highlight); }
+        .cell.selected {
+            background-color: var(--highlight); color: var(--accent);
+            box-shadow: inset 0 0 8px rgba(215,122,97,0.2);
+            transform: scale(0.93);
+        }
+        .cell.found { background-color: var(--primary); color: white; cursor: default; }
+        .cell.found:hover { transform: none; background-color: var(--primary); }
+        .cell.locate-hint {
+            animation: pulse-highlight 1.5s infinite;
+            border: 2px solid var(--accent); color: var(--accent);
+        }
+
+        /* ===== 線索列表 ===== */
+        .clue-list {
+            list-style: none; padding: 0; margin: 0;
+            max-height: clamp(250px, 50vh, 550px);
+            overflow-y: auto; padding-right: 4px;
+        }
+        .clue-list::-webkit-scrollbar { width: 5px; }
+        .clue-list::-webkit-scrollbar-thumb { background: var(--secondary); border-radius: 3px; }
+        .clue-item {
+            display: flex; flex-direction: column;
+            padding: clamp(6px,1.5vw,12px) clamp(5px,1vw,10px);
+            border-bottom: 1px dashed var(--secondary); transition: all 0.3s;
+        }
+        .clue-header {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 4px;
+        }
+        .clue-text {
+            font-size: clamp(0.9rem, 2.8vw, 1.15rem);
+            font-weight: bold; color: var(--wood);
+        }
+        .clue-actions { display: flex; gap: 5px; }
+        .clue-item.found { opacity: 0.4; }
+        .clue-item.found .clue-text { text-decoration: line-through; color: #999; }
+        .clue-item.found .clue-actions { display: none; }
+
+        .btn-poetry, .btn-locate {
+            border: none; padding: 4px 9px; border-radius: 12px;
+            cursor: pointer; font-size: clamp(0.7rem, 2vw, 0.85rem);
+            font-weight: bold; transition: all 0.2s; color: #fff;
+        }
+        .btn-poetry { background-color: var(--primary); }
+        .btn-locate { background-color: var(--wood); }
+        .btn-poetry:disabled, .btn-locate:disabled {
+            background-color: #D1D1D1; cursor: not-allowed; color: #888;
+        }
+
+        .hint-text {
+            margin-top: 6px; font-size: clamp(0.75rem, 2.2vw, 0.95rem);
+            color: var(--primary); display: none; background: #F1F6F1;
+            padding: 6px 10px; border-radius: 8px; border-left: 4px solid var(--primary);
+        }
+        .hint-text.visible { display: block; }
+
+        .status-msg {
+            margin-top: 12px; font-size: clamp(0.85rem, 2.5vw, 1.2rem);
+            text-align: center; color: var(--accent); font-weight: bold;
+            background-color: rgba(255,255,255,0.85);
+            padding: 5px 16px; border-radius: 20px;
+            opacity: 0; transition: opacity 0.3s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        .status-msg.show { opacity: 1; }
+
+        /* ===== 證書 ===== */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(62,74,61,0.85);
+            display: none; justify-content: center; align-items: center;
+            z-index: 100; transition: opacity 1s;
+            padding: 15px; overflow-y: auto;
+        }
+        .certificate {
+            background-color: #FFFDF7;
+            padding: clamp(20px,4vw,40px) clamp(15px,4vw,50px);
+            border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+            max-width: 550px; width: 100%; text-align: center;
+            border: clamp(4px,0.8vw,8px) solid var(--wood);
+        }
+        .cert-title {
+            color: var(--wood); font-size: clamp(1.1rem, 3.5vw, 1.9rem);
+            margin-bottom: 15px; font-weight: bold; letter-spacing: 1px;
+        }
+        .cert-divider { border-top: 2px dashed #DCCDBA; margin: 15px 0; }
+        .cert-content {
+            font-size: clamp(0.9rem, 2.8vw, 1.15rem);
+            line-height: 1.9; text-align: left; margin-bottom: 15px; color: #554E44;
+        }
+        .cert-footer {
+            font-size: clamp(0.8rem, 2.2vw, 0.95rem);
+            color: #887B6C; margin-top: 15px; font-weight: bold;
+        }
+        .cert-action-btns {
+            display: flex; justify-content: center;
+            gap: clamp(8px,2vw,15px); margin-top: 20px; flex-wrap: wrap;
+        }
+        .btn-cert {
+            color: white; border: none;
+            padding: clamp(8px,1.5vw,12px) clamp(15px,3vw,25px);
+            border-radius: 30px; font-size: clamp(0.85rem, 2.5vw, 1.1rem);
+            cursor: pointer; transition: all 0.3s; font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .btn-copy { background-color: var(--wood); }
+        .btn-close { background-color: var(--primary); }
+
+        /* ===== 端午節 ===== */
+        #zongzi-modal {
+            background-color: rgba(255,251,240,0.95);
+            flex-direction: column; overflow: hidden; text-align: center;
+        }
+        .zongzi-title {
+            color: #2E7D32; font-size: clamp(1.5rem, 5vw, 3rem);
+            font-weight: bold; z-index: 10;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 30px; animation: pop-in 0.8s cubic-bezier(0.175,0.885,0.32,1.275);
+        }
+        .zongzi-item {
+            position: absolute; font-size: 3rem; user-select: none;
+            animation: bounce-fall linear forwards;
+            filter: drop-shadow(0 4px 3px rgba(0,0,0,0.3));
+        }
+        .cute-zongzi { width: 70px; height: 70px; }
+
+        #final-farewell {
+            display: none; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            font-size: clamp(1.5rem, 5vw, 3rem);
+            color: var(--primary); font-weight: bold;
+            text-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+            animation: pop-in 1s; text-align: center;
+        }
+
+        /* ===== 電腦版（>768px）左右並排 ===== */
+        @media (min-width: 769px) {
+            .game-container { flex-wrap: nowrap; max-width: 1200px; }
+            .left-panel { flex-shrink: 0; width: auto; max-width: none; flex: 1.2; }
+            .right-panel { min-width: 300px; flex: 1; }
+            .cell { font-size: 1.6rem; }
+            .grid { max-width: 650px; gap: 6px; padding: 12px; }
+        }
+    </style>
+</head>
+<body id="main-body">
+    <a href="../大冒險地圖/index.html" style="position: absolute; top: 15px; left: 15px; padding: 8px 15px; background: rgba(255,255,255,0.8); border-radius: 20px; text-decoration: none; color: #53504A; font-weight: bold; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 1px solid #C3D8C3; transition: all 0.2s;" onmouseover="this.style.background='#fff';this.style.transform='scale(1.05)'" onmouseout="this.style.background='rgba(255,255,255,0.8)';this.style.transform='none'">&larr; 回到大地圖</a>
+
+    <div id="cross-mark">❌</div>
+
+    <script>
+        const leafColors = ['#A37C58','#6A8D73','#C3D8C3','#D77A61'];
+        for (let i = 0; i < 15; i++) {
+            let leaf = document.createElement('div');
+            leaf.className = 'leaf';
+            leaf.style.left = Math.random()*100+'vw';
+            leaf.style.animationDuration = (Math.random()*8+6)+'s';
+            leaf.style.animationDelay = (Math.random()*6)+'s';
+            leaf.style.backgroundColor = leafColors[Math.floor(Math.random()*leafColors.length)];
+            document.body.appendChild(leaf);
+        }
+    </script>
+
+    <audio id="bgm" loop src="bgm.mp3"></audio>
+
+    <div class="stats-bar" id="stats-bar">
+        <div class="stat-item" id="timer-display">⏱️ 00:00</div>
+        <div class="stat-item" id="score-display">🏆 0 分</div>
+        <div class="stat-item" id="progress-display">🎯 0/11</div>
+        <div class="stat-item" id="music-toggle" style="cursor:pointer;" onclick="toggleBgm()">🎵 開啟</div>
+    </div>
+
+    <h1 id="main-title">🌳 森之尋字 🌳</h1>
+
+    <div id="start-screen">
+        <h2>歡迎來到森林迷宮</h2>
+        <p>請輸入您的名字以開始挑戰</p>
+        <input type="text" id="player-name" placeholder="您的姓名" maxlength="15"
+               onkeypress="if(event.key==='Enter') startGame()">
+        <button onclick="startGame()">開始探索</button>
+    </div>
+
+    <div class="subtitle" id="game-subtitle" style="display:none;">
+        找到提示對應的夥伴！拖曳或點擊選取字詞<br>
+        <span style="font-weight:normal; margin-top:3px; display:inline-block;">
+            自立自強 +10 | 詩詞提示 +5 | <span id="locate-text">老花眼定位 +2 (限4次)</span>
+        </span>
+    </div>
+
+    <div class="game-container" id="game-container">
+        <div class="left-panel">
+            <div class="grid" id="grid"></div>
+            <div class="status-msg" id="status-msg"></div>
+        </div>
+        <div class="right-panel">
+            <h2>夥伴線索</h2>
+            <ul class="clue-list" id="clue-list"></ul>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="cert-modal">
+        <div class="certificate">
+            <div class="cert-title">🌸【森之尋字 ‧ 探索成績證明】🌸</div>
+            <div class="cert-divider"></div>
+            <div class="cert-content" id="cert-content"></div>
+            <div class="cert-divider"></div>
+            <div class="cert-footer">發證單位：小綜森之尋字療癒委員會</div>
+            <div class="cert-action-btns">
+                <button class="btn-cert btn-copy" id="copy-btn" onclick="copyCertificate()">📋 一鍵複製</button>
+                <button class="btn-cert btn-close" onclick="showZongziModal()">感謝參與 🌳</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="zongzi-modal" style="display:none;">
+        <div class="zongzi-title">歡迎來到中小綜聯席<br>預祝端午節快樂！🐉</div>
+        <div id="zongzi-container" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></div>
+    </div>
+
+    <div id="final-farewell">🎉 挑戰圓滿結束<br>感謝您的參與！ 🎉</div>
+
+    <script>
+    const wordsData = [
+        {id:0, target:"英瑞", clue:"小狐狸",    hint:"英華映祥瑞"},
+        {id:1, target:"岩勳", clue:"師奶殺手",  hint:"岩峰立功勳"},
+        {id:2, target:"曼寧", clue:"咖啡花草茶",hint:"曼舞伴安寧"},
+        {id:3, target:"麗碧", clue:"自行車師姐",hint:"麗影映碧波"},
+        {id:4, target:"以竣", clue:"汪汪隊",    hint:"以心成竣事"},
+        {id:5, target:"尚儒", clue:"未來校長",  hint:"尚德若儒風"},
+        {id:6, target:"婷媛", clue:"小菊花",    hint:"婷婷如玉媛"},
+        {id:7, target:"莉芬", clue:"粒粒皆辛苦",hint:"茉莉送清芬"},
+        {id:8, target:"桂蓮", clue:"哆啦A夢",   hint:"桂香伴蓮影"},
+        {id:9, target:"音汝", clue:"臭臉王",    hint:"清音寄予汝"},
+        {id:10,target:"凱賓", clue:"小兵立大功",hint:"凱風吹嘉賓"}
+    ];
+    const traps = ["永安","貞瑩","明珊","暄宜"];
+    const fill = "森林迷宮測試遊戲風景美麗鳥語花香清風徐來陽光普照快樂學習療癒身心舒壓放鬆";
+    const GS = 10;
+    let grid=[], selectedCells=[], foundWords=new Set(), score=0;
+    const maxScore = wordsData.length*10;
+    let wordScores={}, playerName="", startTime, timerInterval;
+    let finalMins="00", finalSecs="00", finalEval="", audioCtx;
+    const MAX_LOC = 4; let locUses = 0, firstCoords = {};
+
+    function aud(){
+        if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+        if(audioCtx.state==='suspended') audioCtx.resume();
+        return audioCtx;
+    }
+    function playGood(){
+        try{
+            let c=aud(),o=c.createOscillator(),g=c.createGain();
+            o.type='sine'; o.frequency.setValueAtTime(600,c.currentTime);
+            o.frequency.exponentialRampToValueAtTime(1200,c.currentTime+0.1);
+            g.gain.setValueAtTime(0.35,c.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+0.3);
+            o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+0.3);
+            if('speechSynthesis' in window){
+                let m=new SpeechSynthesisUtterance("Good!");
+                m.lang="en-US"; m.pitch=1.5; m.rate=1.2; m.volume=0.5;
+                speechSynthesis.speak(m);
+            }
+        }catch(e){}
+    }
+    function playErr(){
+        try{
+            let c=aud(),o=c.createOscillator(),g=c.createGain();
+            o.type='sawtooth'; o.frequency.setValueAtTime(200,c.currentTime);
+            o.frequency.exponentialRampToValueAtTime(100,c.currentTime+0.2);
+            g.gain.setValueAtTime(0.15,c.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+0.2);
+            o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+0.2);
+        }catch(e){}
+    }
+    function showX(){
+        playErr();
+        const x=document.getElementById('cross-mark');
+        x.classList.add('show'); setTimeout(()=>x.classList.remove('show'),600);
+    }
+
+    function startGame(){
+        const n=document.getElementById('player-name').value.trim();
+        if(!n){alert("請輸入您的姓名喔！");return;}
+        playerName=n;
+        document.getElementById('start-screen').style.display='none';
+        document.getElementById('game-subtitle').style.display='block';
+        document.getElementById('game-container').style.display='flex';
+        document.getElementById('stats-bar').style.display='flex';
+        aud(); initGame();
+        
+        // 嘗試播放背景音樂
+        let bgm = document.getElementById('bgm');
+        bgm.volume = 0.3; // 音量 30%
+        bgm.play().then(() => {
+            document.getElementById('music-toggle').textContent = "🎵 關閉";
+        }).catch(err => {
+            console.log("瀏覽器阻擋自動播放，或找不到 bgm.mp3", err);
+            document.getElementById('music-toggle').textContent = "🎵 開啟";
+        });
+    }
+
+    function toggleBgm() {
+        let bgm = document.getElementById('bgm');
+        let btn = document.getElementById('music-toggle');
+        if (bgm.paused) {
+            bgm.play();
+            btn.textContent = "🎵 關閉";
+        } else {
+            bgm.pause();
+            btn.textContent = "🎵 開啟";
+        }
+    }
+
+    function initGame(){
+        locUses=0;
+        document.getElementById('locate-text').textContent='老花眼定位 +2 (限4次)';
+        wordsData.forEach(w=>wordScores[w.id]=10);
+        grid=Array(GS).fill(null).map(()=>Array(GS).fill(''));
+        wordsData.forEach(w=>placeWord(w.target,w.id));
+        traps.forEach(t=>placeWord(t,-1));
+        for(let r=0;r<GS;r++) for(let c=0;c<GS;c++)
+            if(grid[r][c]==='') grid[r][c]=fill[Math.floor(Math.random()*fill.length)];
+        renderGrid(); renderClues();
+        startTime=Date.now(); startTimer(); updateStats();
+    }
+
+    function placeWord(word,wid){
+        let placed=false, att=0;
+        while(!placed&&att<300){
+            let dir=Math.random()<0.5?'H':'V';
+            let w=Math.random()<0.3?word.split('').reverse().join(''):word;
+            let r=Math.floor(Math.random()*GS), c=Math.floor(Math.random()*GS);
+            if(dir==='H'&&c+w.length<=GS){
+                let ok=true;
+                for(let i=0;i<w.length;i++) if(grid[r][c+i]!==''&&grid[r][c+i]!==w[i]){ok=false;break;}
+                if(ok){
+                    for(let i=0;i<w.length;i++) grid[r][c+i]=w[i];
+                    if(wid!==-1) firstCoords[wid]={r,c:(w===word)?c:c+w.length-1};
+                    placed=true;
+                }
+            } else if(dir==='V'&&r+w.length<=GS){
+                let ok=true;
+                for(let i=0;i<w.length;i++) if(grid[r+i][c]!==''&&grid[r+i][c]!==w[i]){ok=false;break;}
+                if(ok){
+                    for(let i=0;i<w.length;i++) grid[r+i][c]=w[i];
+                    if(wid!==-1) firstCoords[wid]={r:(w===word)?r:r+w.length-1,c};
+                    placed=true;
+                }
+            }
+            att++;
+        }
+    }
+
+    function renderGrid(){
+        const g=document.getElementById('grid'); g.innerHTML='';
+        for(let r=0;r<GS;r++) for(let c=0;c<GS;c++){
+            const d=document.createElement('div');
+            d.className='cell'; d.textContent=grid[r][c];
+            d.id=`cell-${r}-${c}`; d.dataset.r=r; d.dataset.c=c;
+            d.addEventListener('mousedown',onDown);
+            d.addEventListener('mouseenter',onMove);
+            g.appendChild(d);
+        }
+        document.addEventListener('mouseup',onUp);
+        g.addEventListener('touchstart',e=>{
+            e.preventDefault(); let t=e.touches[0];
+            let el=cellAt(t.clientX,t.clientY); if(el) onDown({target:el});
+        },{passive:false});
+        g.addEventListener('touchmove',e=>{
+            e.preventDefault(); let t=e.touches[0];
+            let el=cellAt(t.clientX,t.clientY); if(el) onMove({target:el});
+        },{passive:false});
+        g.addEventListener('touchend',onUp);
+    }
+
+    function cellAt(x,y){
+        let el=document.elementFromPoint(x,y);
+        if(!el) return null;
+        if(el.classList.contains('cell')) return el;
+        if(el.closest&&el.closest('.cell')) return el.closest('.cell');
+        return null;
+    }
+
+    let dragging=false;
+    function onDown(e){
+        let t=e.target.closest?e.target.closest('.cell'):e.target;
+        if(!t||t.classList.contains('found')) return;
+        dragging=true; selectedCells=[t]; updSel();
+    }
+    function onMove(e){
+        if(!dragging) return;
+        let t=e.target.closest?e.target.closest('.cell'):e.target;
+        if(!t||t.classList.contains('found')) return;
+        if(selectedCells[selectedCells.length-1]!==t){
+            let r1=+selectedCells[0].dataset.r, c1=+selectedCells[0].dataset.c;
+            let r2=+t.dataset.r, c2=+t.dataset.c;
+            if((r1===r2||c1===c2)&&!selectedCells.includes(t)) selectedCells.push(t);
+        }
+        updSel();
+    }
+    function onUp(){
+        if(!dragging) return; dragging=false;
+        if(selectedCells.length>=2) checkSel();
+        selectedCells.forEach(c=>c.classList.remove('selected'));
+        selectedCells=[];
+    }
+    function updSel(){
+        document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected'));
+        selectedCells.forEach(c=>c.classList.add('selected'));
+    }
+
+    function checkSel(){
+        let sorted=[...selectedCells].sort((a,b)=>{
+            let d=a.dataset.r-b.dataset.r; return d!==0?d:a.dataset.c-b.dataset.c;
+        });
+        let w=sorted.map(c=>c.textContent).join('');
+        let wr=sorted.map(c=>c.textContent).reverse().join('');
+
+        if(traps.includes(w)||traps.includes(wr)){
+            showX(); showMsg(`「${w}」是誘導陷阱！`); return;
+        }
+        let m=wordsData.find(d=>(d.target===w||d.target===wr)&&!foundWords.has(d.id));
+        if(m){
+            foundWords.add(m.id);
+            sorted.forEach(c=>{c.classList.add('found');c.classList.remove('locate-hint');});
+            let pts=wordScores[m.id]; score+=pts;
+            document.getElementById(`clue-${m.id}`).classList.add('found');
+            showMsg(`太棒了！找到「${m.target}」(+${pts}分)`);
+            updateStats();
+            playGood();
+            if(foundWords.size===wordsData.length) setTimeout(endGame,1000);
+        } else { showX(); showMsg("不對喔，再找找看！"); }
+    }
+
+    function renderClues(){
+        const l=document.getElementById('clue-list'); l.innerHTML='';
+        wordsData.forEach(w=>{
+            const li=document.createElement('li');
+            li.className='clue-item'; li.id=`clue-${w.id}`;
+            li.innerHTML=`
+                <div class="clue-header">
+                    <span class="clue-text">${w.clue}</span>
+                    <div class="clue-actions">
+                        <button class="btn-poetry" id="bp-${w.id}" onclick="usePoetry(${w.id})">詩詞+5</button>
+                        <button class="btn-locate" id="bl-${w.id}" onclick="useLoc(${w.id})">老花+2</button>
+                    </div>
+                </div>
+                <div class="hint-text" id="ht-${w.id}">${w.hint}</div>`;
+            l.appendChild(li);
+        });
+    }
+
+    window.usePoetry=function(id){
+        if(wordScores[id]>5) wordScores[id]=5;
+        document.getElementById(`bp-${id}`).disabled=true;
+        document.getElementById(`bp-${id}`).textContent="已用";
+        document.getElementById(`ht-${id}`).classList.add('visible');
+        showMsg("已顯示詩詞提示！(+5分)");
+    };
+    window.useLoc=function(id){
+        if(locUses>=MAX_LOC){showMsg("定位次數已用盡！");return;}
+        wordScores[id]=2;
+        document.getElementById(`bl-${id}`).disabled=true;
+        document.getElementById(`bl-${id}`).textContent="已定";
+        let co=firstCoords[id];
+        if(co){let cel=document.getElementById(`cell-${co.r}-${co.c}`);
+            if(cel&&!cel.classList.contains('found')) cel.classList.add('locate-hint');}
+        locUses++; let rem=MAX_LOC-locUses;
+        document.getElementById('locate-text').textContent=`老花眼定位 +2 (餘${rem}次)`;
+        showMsg(`已標記首字！還剩 ${rem} 次`);
+        if(rem===0) document.querySelectorAll('.btn-locate').forEach(b=>{
+            if(!b.disabled){b.disabled=true;b.textContent="用盡";}
+        });
+    };
+
+    function showMsg(m){
+        const e=document.getElementById('status-msg');
+        e.textContent=m; e.classList.add('show');
+        setTimeout(()=>{if(e.textContent===m) e.classList.remove('show');},2500);
+    }
+    function startTimer(){
+        timerInterval=setInterval(()=>{
+            let s=Math.floor((Date.now()-startTime)/1000);
+            let mm=String(Math.floor(s/60)).padStart(2,'0');
+            let ss=String(s%60).padStart(2,'0');
+            document.getElementById('timer-display').textContent=`⏱️ ${mm}:${ss}`;
+        },1000);
+    }
+    function updateStats(){
+        document.getElementById('score-display').textContent=`🏆 ${score} 分`;
+        document.getElementById('progress-display').textContent=`🎯 ${foundWords.size}/${wordsData.length}`;
+    }
+
+    function endGame(){
+        clearInterval(timerInterval);
+        let el=Math.floor((Date.now()-startTime)/1000);
+        finalMins=String(Math.floor(el/60)).padStart(2,'0');
+        finalSecs=String(el%60).padStart(2,'0');
+
+        if(score===maxScore){
+            if(el<=60) finalEval="👑 傳說境界！不到一分鐘就滿分破關，擁有神一般的觀察力與直覺！";
+            else if(el<=120) finalEval="🔥 絕頂高手！全憑敏銳的眼光與過人的速度找齊夥伴！";
+            else if(el<=240) finalEval="🌟 慧眼獨具！不依賴提示，穩健地找出所有夥伴！";
+            else finalEval="🧘 沉穩內斂！以無比的耐心與專注完成完美挑戰！";
+        } else if(score>=80){
+            if(el<=60) finalEval="⚡ 迅捷如風！靈活運用提示快速通關！";
+            else if(el<=120) finalEval="🦅 鷹眼探員！掌握了極佳的節奏與判斷力！";
+            else if(el<=240) finalEval="🌿 溫柔好手！善用提示以完美的節奏探索！";
+            else finalEval="🍃 悠然自得！不疾不徐地細細品味尋找的樂趣！";
+        } else if(score>=50){
+            if(el<=60) finalEval="🚀 衝刺達人！速度極快，活力滿滿！";
+            else if(el<=120) finalEval="🧭 森林遊俠！靈活借助提示，充滿探險精神！";
+            else if(el<=240) finalEval="🌻 潛力新星！善用提示穩步前進，每次探索都是成長！";
+            else finalEval="🏕️ 漫步旅人！放慢腳步享受風景，也是美好的旅程！";
+        } else {
+            if(el<=60) finalEval="🌪️ 旋風過境！下次可以放慢腳步欣賞森林喔！";
+            else if(el<=120) finalEval="🌱 充滿活力！積極嘗試各種線索，展現滿滿好奇心！";
+            else if(el<=240) finalEval="🍄 迷途小鹿！雖小小迷路但努力走完全程，精神可嘉！";
+            else finalEval="🐌 慢活大師！最重要的是享受這段平靜的療癒時光！";
+        }
+
+        document.getElementById('cert-content').innerHTML=`
+            <div>玆證明 探索家：<strong style="color:var(--accent);font-size:1.2em;">${playerName}</strong></div>
+            <div>於西元${new Date().getFullYear()}年「森之尋字」挑戰中圓滿過關！</div><br>
+            <div>⏱️ 探索耗時：<strong style="color:var(--primary);">${finalMins} 分 ${finalSecs} 秒</strong></div>
+            <div>🎯 尋獲夥伴：<strong style="color:var(--primary);">${foundWords.size}/${wordsData.length} 位</strong></div>
+            <div>🏆 榮譽積分：<strong style="color:var(--primary);">${score}/${maxScore} 分</strong></div>
+            <div style="margin-top:12px;color:var(--wood);font-weight:bold;">💮 探索評價：${finalEval}</div>`;
+        document.getElementById('cert-modal').style.display='flex';
+        
+        // == 發放通關憑證 ==
+        localStorage.setItem('cert_idiom', 'true');
+    }
+
+    window.copyCertificate=function(){
+        const t=`🌸【森之尋字 ‧ 探索成績證明】🌸\n${'='.repeat(35)}\n玆證明 探索家：${playerName}\n於西元${new Date().getFullYear()}年「森之尋字」挑戰中圓滿過關！\n\n⏱️ 探索耗時：${finalMins} 分 ${finalSecs} 秒\n🎯 尋獲夥伴：${foundWords.size}/${wordsData.length} 位\n🏆 榮譽積分：${score}/${maxScore} 分\n💮 探索評價：${finalEval}\n\n發證單位：小綜森之尋字療癒委員會\n${'='.repeat(35)}\n感謝您參與的每一步！🌳`;
+        navigator.clipboard.writeText(t).then(()=>{
+            const b=document.getElementById('copy-btn');
+            b.textContent="✅ 已複製！"; b.style.backgroundColor="var(--primary)";
+            setTimeout(()=>{b.textContent="📋 一鍵複製";b.style.backgroundColor="var(--wood)";},2000);
+        }).catch(()=>alert("複製失敗，請手動選取文字複製！"));
+    };
+
+    window.showZongziModal=function(){
+        document.getElementById('cert-modal').style.display='none';
+        document.getElementById('zongzi-modal').style.display='flex';
+        const ct=document.getElementById('zongzi-container'); ct.innerHTML='';
+        const svgs=[
+            '<svg class="cute-zongzi" viewBox="0 0 100 100"><polygon points="50,10 90,80 10,80" fill="#4CAF50"/><polygon points="50,10 70,80 30,80" fill="#388E3C"/><circle cx="40" cy="60" r="4" fill="#333"/><circle cx="60" cy="60" r="4" fill="#333"/><path d="M45,70 Q50,75 55,70" stroke="#333" stroke-width="2" fill="transparent"/></svg>',
+            '<svg class="cute-zongzi" viewBox="0 0 100 100"><polygon points="50,15 85,85 15,85" fill="#8BC34A"/><polygon points="50,15 75,85 25,85" fill="#689F38"/><circle cx="40" cy="65" r="5" fill="#333"/><circle cx="60" cy="65" r="5" fill="#333"/><circle cx="50" cy="75" r="4" fill="#FF5252"/></svg>',
+            '🐉','🥟','🎋'
+        ];
+        for(let i=0;i<35;i++){
+            let z=document.createElement('div'); z.className='zongzi-item';
+            z.innerHTML=svgs[Math.floor(Math.random()*svgs.length)];
+            z.style.left=(Math.random()*90)+'vw';
+            z.style.animationDuration=(2+Math.random()*3)+'s';
+            z.style.animationDelay=(Math.random()*2)+'s';
+            z.style.transform=`scale(${0.5+Math.random()})`;
+            ct.appendChild(z);
+        }
+        setTimeout(()=>{
+            document.getElementById('zongzi-modal').style.opacity='0';
+            setTimeout(()=>document.getElementById('zongzi-modal').style.display='none',1000);
+            ['game-container','main-title','game-subtitle','stats-bar'].forEach(id=>{
+                document.getElementById(id).style.opacity='0';
+            });
+            setTimeout(()=>{
+                ['game-container','main-title','game-subtitle','stats-bar'].forEach(id=>{
+                    document.getElementById(id).style.display='none';
+                });
+                document.getElementById('final-farewell').style.display='block';
+            },1000);
+        },8000);
+    };
+    </script>
+</body>
+</html>
