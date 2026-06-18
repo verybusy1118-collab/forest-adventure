@@ -169,16 +169,6 @@
       75% { transform: translateX(-10px); }
     }
 
-    /* Fireworks */
-    .firework {
-      position: absolute; width: 5px; height: 5px; border-radius: 50%;
-      animation: explode 1s ease-out forwards;
-    }
-    @keyframes explode {
-      0% { transform: translate(0,0) scale(1); opacity: 1; }
-      100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
-    }
-
     /* Victory Image Pop */
     .victory-container {
       display: flex;
@@ -280,14 +270,14 @@
     <div class="victory-container">
       <div>
         <h1>🏆 冒險完成！</h1>
-        <h2>請領取冒險者金幣2枚</h2>
-        <div class="victory-stats" id="time-display">總冒險時長：00 分 00 秒</div>
+        <h2 style="margin-bottom: 30px;">請領取冒險者金幣2枚</h2>
         <button class="btn-restart" onclick="resetProgress()">再次冒險</button>
       </div>
       <img src="ending.png" class="victory-img" alt="冒險成功" />
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script>
     // --- Intro Video Logic ---
     const introContainer = document.getElementById('intro-container');
@@ -555,38 +545,30 @@
     function showVictory() {
       document.getElementById('gate-modal').classList.remove('active');
       document.getElementById('victory-screen').style.display = 'flex';
-      
-      const startTime = parseInt(localStorage.getItem('adventure_start') || Date.now());
-      const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-      const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
-      const secs = String(elapsedSeconds % 60).padStart(2, '0');
-      
-      document.getElementById('time-display').textContent = `總冒險時長：${mins} 分 ${secs} 秒`;
-
       createFireworks();
     }
 
     function createFireworks() {
-      const colors = ['#FFD54F', '#4CAF50', '#FF5252', '#03A9F4', '#E040FB'];
-      for(let i=0; i<50; i++) {
-        setTimeout(() => {
-          const fw = document.createElement('div');
-          fw.className = 'firework';
-          fw.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-          fw.style.left = 20 + Math.random() * 60 + 'vw';
-          fw.style.top = 20 + Math.random() * 50 + 'vh';
-          
-          for(let p=0; p<12; p++) {
-            const part = fw.cloneNode();
-            const angle = p * (Math.PI * 2 / 12);
-            const dist = 50 + Math.random() * 100;
-            part.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
-            part.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-            document.getElementById('victory-screen').appendChild(part);
-            setTimeout(() => part.remove(), 1000);
-          }
-        }, i * 150);
+      var duration = 5 * 1000;
+      var animationEnd = Date.now() + duration;
+      var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 3000 };
+
+      function randomInRange(min, max) {
+        return Math.random() * (max - min) + min;
       }
+
+      var interval = setInterval(function() {
+        var timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        var particleCount = 50 * (timeLeft / duration);
+        // since particles fall down, start a bit higher than random
+        confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+        confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+      }, 250);
     }
 
     // Init
